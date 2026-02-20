@@ -1,0 +1,576 @@
+---
+name: parallel-dev-orchestration
+description: Orchestrate parallel development across multiple agents for maximum velocity
+---
+
+# Parallel Development Orchestration
+
+Maximize development velocity by coordinating multiple specialized agents working on independent tasks simultaneously.
+
+## When to Use
+
+- ✅ Multiple independent tasks available (no blocking dependencies)
+- ✅ 1-week sprint with aggressive timeline
+- ✅ Tasks can be parallelized by domain (backend, frontend, DB, UX)
+- ✅ Team has clear TaskMaster task breakdown
+
+## Architecture Overview
+
+```
+Orchestrator (Main Claude)
+    ├── backend-dev (Terminal 2)
+    │   └── Tasks: 1.1, 2.2, 4.x, 6.x, 7.x
+    ├── frontend-dev (Terminal 3)
+    │   └── Tasks: 1.2, 5.x, 8.x, 19.x
+    ├── db-architect (Terminal 4)
+    │   └── Tasks: 2.1, 2.3, 2.4
+    ├── integration-tester (Terminal 5)
+    │   └── Tasks: 22.x, 23.x, 24.x
+    └── ux-analyst (Terminal 6)
+        └── Tasks: UX reviews, accessibility audits
+```
+
+## Setup Phase
+
+### 1. Analyze Task Dependencies
+
+```bash
+# Get all tasks with dependencies
+task-master list
+
+# Look for independent task chains
+# Example output:
+# 1 (no deps) → 2, 3, 31
+# 2 (depends on 1) → 4, 7
+# 3 (depends on 1) → independent
+# 4 (depends on 2) → 5, 6
+```
+
+**Identify parallel work streams:**
+- Stream A: 1.1 → 2.1 → 2.2 → 4.x → 6.x (backend chain)
+- Stream B: 1.2 → 5.x → 8.x (frontend chain)
+- Stream C: 3 (infrastructure - can run in parallel)
+- Stream D: UX reviews (can review designs while code in progress)
+
+### 2. Assign Agents to Streams
+
+| Agent | Stream | Terminal | Tasks |
+|-------|--------|----------|-------|
+| **backend-dev** | A | 2 | 1.1, 2.2, 4.x, 6.x, 7.x, 10.x, 11.x, 13.x, 14.x, 15.x |
+| **frontend-dev** | B | 3 | 1.2, 5.x, 8.x, 9.x, 19.x, 20.x |
+| **db-architect** | A (sub) | 4 | 2.1, 2.3, 2.4 |
+| **integration-tester** | C | 5 | 21.x, 22.x, 23.x, 24.x |
+| **ux-analyst** | D | 6 | UX evaluations, accessibility audits |
+
+### 3. Launch Agent Terminals
+
+```bash
+# Terminal 1: Orchestrator (YOU - main coordinator)
+cd /path/to/project
+claude
+
+# Terminal 2: Backend Developer
+cd /path/to/project
+claude --agent backend-dev
+
+# Terminal 3: Frontend Developer
+cd /path/to/project
+claude --agent frontend-dev
+
+# Terminal 4: Database Architect
+cd /path/to/project
+claude --agent db-architect
+
+# Terminal 5: Integration Tester
+cd /path/to/project
+claude --agent integration-tester
+
+# Terminal 6: UX Analyst
+cd /path/to/project
+claude --agent ux-analyst
+```
+
+## Orchestration Workflow
+
+### Phase 1: Initial Kickoff (Day 1, Hour 0)
+
+**Orchestrator sends initial instructions to each agent:**
+
+**To backend-dev (Terminal 2):**
+```
+You are backend-dev agent. Your first task:
+
+1. Run: task-master show 1.1
+2. Implement: Initialize FastAPI backend project
+3. Follow your agent instructions for commit workflow
+4. When done: task-master set-status --id=1.1 --status=done
+5. Report back: "Task 1.1 complete. Ready for next task."
+```
+
+**To frontend-dev (Terminal 3):**
+```
+You are frontend-dev agent. Your first task:
+
+1. Run: task-master show 1.2
+2. Implement: Initialize Next.js frontend project
+3. Follow your agent instructions for commit workflow
+4. When done: task-master set-status --id=1.2 --status=done
+5. Report back: "Task 1.2 complete. Ready for next task."
+```
+
+**To db-architect (Terminal 4):**
+```
+You are db-architect agent. Your first task:
+
+1. Run: task-master show 2.1
+2. Design: Create database schema (ERD + models)
+3. Document in docs/db/schema.md
+4. When done: task-master set-status --id=2.1 --status=done
+5. Report back: "Schema designed. Ready to create migrations."
+```
+
+### Phase 2: Monitoring Progress (Every 30 minutes)
+
+**Orchestrator checks status:**
+
+```bash
+# Check all task statuses
+task-master list
+
+# Expected output:
+# 1.1 [done] Initialize FastAPI backend
+# 1.2 [done] Initialize Next.js frontend
+# 2.1 [done] Design database schema
+# 2.2 [in-progress] Create SQLAlchemy models
+# 4.1 [pending] Create OAuth configuration
+```
+
+**Orchestrator actions:**
+1. Identify completed tasks
+2. Identify next available tasks (dependencies satisfied)
+3. Assign next tasks to idle agents
+
+**Example assignment:**
+
+```
+To backend-dev:
+"Task 1.1 done ✅. Next task: 4.1 (Create OAuth configuration).
+Run: task-master show 4.1"
+
+To db-architect:
+"Task 2.1 done ✅. Next task: 2.2 (Create SQLAlchemy models).
+Dependencies: Your schema design from 2.1.
+Run: task-master show 2.2"
+```
+
+### Phase 3: Handling Blockers
+
+**Agent reports blocker:**
+
+```
+backend-dev: "Task 4.3 blocked. Need INSTAGRAM_APP_ID from .env.
+Cannot test OAuth without real credentials."
+```
+
+**Orchestrator response:**
+
+```
+1. Create Instagram App in Meta for Developers
+2. Get APP_ID and APP_SECRET
+3. Update backend/.env
+4. Reply to backend-dev: "Credentials added to .env. Proceed with 4.3."
+```
+
+**OR delegate:**
+
+```
+To frontend-dev: "backend-dev is blocked on OAuth credentials.
+While waiting, start Task 8.1 (Build product registration modal).
+This can use mock data for now."
+```
+
+### Phase 4: Integration Points (Critical Coordination)
+
+**Example: Backend API ready, frontend needs to integrate**
+
+**backend-dev reports:**
+```
+"Task 6.1 done ✅.
+POST /api/posts endpoint live at http://localhost:8000/api/posts.
+Returns JSON: { posts: [...], total: 20 }
+frontend-dev can now integrate."
+```
+
+**Orchestrator to frontend-dev:**
+```
+"Backend API ready. Update your Task 5.2 notes:
+- Endpoint: POST /api/posts
+- Response: { posts: [...], total: 20 }
+- Test with: curl http://localhost:8000/api/posts -H 'Authorization: Bearer TOKEN'
+
+Proceed with frontend integration."
+```
+
+### Phase 5: Testing Coordination
+
+**Orchestrator to integration-tester:**
+```
+"Backend tasks 4.x and 6.x complete.
+Frontend task 5.x complete.
+
+Start integration testing:
+1. Test OAuth flow end-to-end
+2. Test post fetching via frontend
+3. Report any issues in task-master update-subtask
+4. Tag bugs with severity (Critical/High/Medium/Low)"
+```
+
+**Tester reports:**
+```
+"CRITICAL BUG in OAuth flow (Task 4.3):
+Access token not saved to database.
+User redirected to dashboard but API calls fail with 401.
+
+Root cause: backend/routers/auth.py line 42
+Fix needed: Save token to DB after exchange"
+```
+
+**Orchestrator to backend-dev:**
+```
+"URGENT: Critical bug in Task 4.3.
+See integration-tester's report in task-master show 22.1.
+Fix immediately before proceeding to Task 4.4."
+```
+
+## Communication Patterns
+
+### 1. Task Completion Announcements
+
+**Agent template:**
+```
+Task X.Y complete ✅
+
+What was done:
+- <bullet points>
+
+Commits:
+- <commit hash> feat(scope): <message>
+
+Notes for next agent:
+- <important details>
+
+Ready for: Task X.Z
+```
+
+### 2. Blocker Reports
+
+**Agent template:**
+```
+Task X.Y BLOCKED 🚫
+
+Blocker: <what's blocking>
+Impact: <which tasks affected>
+Needed: <what's needed to unblock>
+Workaround: <if any>
+
+Waiting for: <dependency or orchestrator action>
+```
+
+### 3. Integration Handoffs
+
+**Agent template:**
+```
+Task X.Y ready for integration 🔗
+
+Deliverable: <API endpoint / component / feature>
+Location: <file path or URL>
+Usage: <how to use>
+Tests: <how to test>
+
+Next agent: <who needs this>
+```
+
+## Parallelization Strategies
+
+### Strategy 1: Domain Splitting
+
+**Backend and Frontend in parallel (most common):**
+
+```
+Day 1:
+├── backend-dev: OAuth backend (4.x)
+└── frontend-dev: OAuth UI (5.x) with mocks
+
+Day 2:
+├── backend-dev: Posts API (6.x)
+└── frontend-dev: Dashboard UI (8.x) with mocks
+
+Day 3 (Integration):
+├── backend-dev: On standby for bug fixes
+├── frontend-dev: Replace mocks with real API
+└── integration-tester: E2E testing
+```
+
+### Strategy 2: Feature Pipelining
+
+**Stagger tasks like assembly line:**
+
+```
+Hour 0-2:
+└── db-architect: Design schema (2.1)
+
+Hour 2-4:
+├── db-architect: Create migrations (2.2)
+└── backend-dev: Setup FastAPI routes (starts early)
+
+Hour 4-6:
+├── backend-dev: Implement OAuth (4.x)
+└── frontend-dev: Build OAuth UI (5.x)
+
+Hour 6-8:
+└── integration-tester: Test OAuth flow (22.x)
+```
+
+### Strategy 3: Review While Building
+
+**UX analyst reviews designs while developers implement:**
+
+```
+Morning:
+├── frontend-dev: Build product registration modal (8.1)
+└── ux-analyst: Review wireframes for next feature (logs UI)
+
+Afternoon:
+├── ux-analyst: Heuristic evaluation of product modal
+└── ux-analyst reports issues
+└── frontend-dev: Fix UX issues immediately
+```
+
+## Orchestrator Monitoring Tools
+
+### Dashboard View (Run every 30 min)
+
+```bash
+# Create orchestrator script: scripts/dashboard.sh
+
+#!/bin/bash
+
+echo "=== TaskMaster Status Dashboard ==="
+echo ""
+
+# Show pending tasks
+echo "⏳ PENDING TASKS:"
+task-master list | grep pending
+
+# Show in-progress tasks
+echo ""
+echo "🔨 IN PROGRESS:"
+task-master list | grep in-progress
+
+# Show recently completed
+echo ""
+echo "✅ RECENTLY COMPLETED:"
+git log --since="4 hours ago" --oneline | head -10
+
+# Show agent activity (if using separate branches)
+echo ""
+echo "👥 AGENT ACTIVITY:"
+git branch -v
+
+echo ""
+echo "=== End Dashboard ==="
+```
+
+**Run: `bash scripts/dashboard.sh`**
+
+### Real-Time Commit Monitoring
+
+```bash
+# Watch git commits in real-time (requires watch command)
+watch -n 30 'git log --since="1 hour ago" --pretty=format:"%h %an %s" | head -10'
+```
+
+### Slack/Discord Integration (Optional)
+
+```bash
+# Post commit notifications to Slack
+# Add to .git/hooks/post-commit
+
+#!/bin/bash
+COMMIT_MSG=$(git log -1 --pretty=%B)
+COMMIT_HASH=$(git log -1 --pretty=%h)
+
+curl -X POST https://hooks.slack.com/services/YOUR/WEBHOOK/URL \
+  -H 'Content-Type: application/json' \
+  -d "{\"text\": \"Commit $COMMIT_HASH: $COMMIT_MSG\"}"
+```
+
+## Risk Management
+
+### Merge Conflicts
+
+**Prevention:**
+- Agents work in separate directories (backend/ vs frontend/)
+- Coordinate on shared files (CLAUDE.md, .env.example)
+- Pull frequently
+
+**Resolution:**
+```bash
+# Agent reports conflict
+"Cannot push. Conflict in CLAUDE.md."
+
+# Orchestrator coordinates:
+"backend-dev: Pull latest, resolve conflict, re-push.
+frontend-dev: Wait for backend-dev to push before pulling."
+```
+
+### Dependency Deadlocks
+
+**Example:**
+```
+frontend-dev: "Blocked on backend API (Task 6.x)"
+backend-dev: "Blocked on DB schema (Task 2.x)"
+db-architect: "Blocked on requirements from frontend (Task 8.x)"
+```
+
+**Resolution:**
+1. Identify cycle
+2. Break dependency with mocks
+3. "frontend-dev: Use mock API data for now. Backend will implement real API later."
+
+### Overcommitment
+
+**Symptom:**
+```
+5 agents active
+All agents in-progress on tasks
+No completions in 2 hours
+```
+
+**Solution:**
+```
+Orchestrator: "STOP. Everyone focus on finishing current task before starting new ones.
+Velocity = completed tasks, not started tasks."
+```
+
+## Metrics & KPIs
+
+### Daily Targets (1-week MVP)
+
+| Metric | Day 1 | Day 2-6 | Day 7 |
+|--------|-------|---------|-------|
+| Tasks completed | 3-5 | 4-6 | 2-3 |
+| Commits | 20-30 | 30-50 | 10-20 |
+| Agents active | 3-4 | 4-5 | 2-3 |
+| Blockers resolved | 1-2 | 2-3 | 0-1 |
+
+### Velocity Tracking
+
+```bash
+# Completed tasks per day
+task-master list | grep done | wc -l
+
+# Commits per agent (identify bottlenecks)
+git shortlog -sn --since="1 day ago"
+
+# Average task completion time
+# (requires logging timestamps in update_subtask)
+```
+
+## Example: Perfect Day of Parallel Development
+
+### Day 2 Schedule (8 hours)
+
+**9:00 AM - Kickoff**
+```
+Orchestrator assigns:
+- backend-dev: Task 4.1 (OAuth config)
+- frontend-dev: Task 5.1 (OAuth UI)
+- db-architect: Task 2.3 (Migrations)
+- integration-tester: Prepare test environments
+```
+
+**11:00 AM - Check-in #1**
+```
+✅ backend-dev: Task 4.1 done
+✅ db-architect: Task 2.3 done
+🔨 frontend-dev: Task 5.1 in progress (80% done)
+✅ integration-tester: Test env ready
+
+Orchestrator assigns:
+- backend-dev: Task 4.2 (Token encryption)
+- db-architect: Task 2.4 (DB connection module)
+```
+
+**1:00 PM - Check-in #2**
+```
+✅ frontend-dev: Task 5.1 done
+✅ backend-dev: Task 4.2 done
+🔨 db-architect: Task 2.4 in progress
+
+Orchestrator assigns:
+- backend-dev: Task 4.3 (OAuth callback endpoint)
+- frontend-dev: Task 8.1 (Product registration modal)
+```
+
+**3:00 PM - Integration Point**
+```
+✅ backend-dev: Task 4.3 done (OAuth backend complete!)
+✅ db-architect: Task 2.4 done
+
+Orchestrator coordinates:
+- integration-tester: Test OAuth end-to-end (Task 22.1)
+- frontend-dev: Continue Task 8.1
+- backend-dev: Standby for bug fixes
+```
+
+**5:00 PM - End of Day**
+```
+✅ Tasks completed today: 7
+✅ Commits: 42
+✅ Integration tests: 1 passed, 1 bug found (fixed)
+✅ No blockers remaining
+
+Tomorrow plan:
+- Continue Task 8.1 (frontend-dev)
+- Start Task 6.1 (backend-dev: Posts API)
+- Start Task 13.1 (backend-dev: GPT-4o integration)
+```
+
+## Troubleshooting
+
+### "Too many agents, too chaotic"
+**Solution:** Start with 2-3 agents. Add more only when comfortable.
+
+### "Agents stepping on each other"
+**Solution:** Stricter directory boundaries. backend/ vs frontend/ vs docs/.
+
+### "Hard to track who's doing what"
+**Solution:** Use TaskMaster `update_subtask` religiously. Check `task-master list` frequently.
+
+### "Integration breaking frequently"
+**Solution:** Add integration-tester earlier. Test after every 2-3 completed tasks.
+
+## Summary: Orchestrator Checklist
+
+Daily (Morning):
+- [ ] Review yesterday's progress
+- [ ] Identify today's task priorities
+- [ ] Assign tasks to agents
+- [ ] Ensure no blockers
+
+Every 30-60 minutes:
+- [ ] Check task-master list
+- [ ] Review git commits
+- [ ] Assign next tasks to idle agents
+- [ ] Respond to blocker reports
+
+Daily (Evening):
+- [ ] Count completed tasks
+- [ ] Identify tomorrow's priorities
+- [ ] Ensure all agents pushed code
+- [ ] Update project CLAUDE.md if needed
+
+---
+
+**Remember: Orchestrator is not a developer. You are a coordinator. Keep agents unblocked and productive.**

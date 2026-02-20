@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash scripts/monitor-agents.sh)",
+      "WebSearch",
+      "WebFetch(domain:developers.facebook.com)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "task-master-ai"
+  ],
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '\n💾 Session ending. Run /session-checkpoint to save context.\n\nPreserves:\n  ✅ Verified working approaches\n  ❌ Failed approaches with reasoning\n  🔬 Unattempted approaches\n  📋 Remaining action items'",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}

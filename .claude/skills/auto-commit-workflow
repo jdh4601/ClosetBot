@@ -1,0 +1,467 @@
+---
+name: auto-commit-workflow
+description: Automated commit workflow for rapid code-write-test-fix cycles with quality gates
+---
+
+# Auto-Commit Workflow
+
+Maximize development velocity with automated, frequent commits while maintaining code quality.
+
+## Core Principle
+
+**Commit every 15 minutes of productive work, or after every logical unit of progress.**
+
+Small, frequent commits are:
+- ✅ Easier to review
+- ✅ Safer to revert
+- ✅ Better for team visibility
+- ✅ Lower risk deployments
+- ✅ Clearer history
+
+## Commit Triggers (Auto-Commit Points)
+
+### 1. Feature Implementation
+```bash
+# ✅ Implement 1 function → Commit
+git add backend/services/instagram.py
+git commit -m "feat(backend): add fetch_user_posts service function (task 6.1)"
+
+# ✅ Add 1 component → Commit
+git add frontend/components/PostCard.tsx
+git commit -m "feat(frontend): create PostCard component (task 8.2)"
+```
+
+### 2. Test Addition
+```bash
+# ✅ Add tests for function → Commit
+git add backend/tests/test_instagram_service.py
+git commit -m "test(backend): add tests for fetch_user_posts (task 6.1)"
+```
+
+### 3. Bug Fix
+```bash
+# ✅ Fix any bug → Commit immediately
+git add backend/routers/auth.py
+git commit -m "fix(backend): handle missing access_token in OAuth callback (task 4.3)"
+```
+
+### 4. Configuration Change
+```bash
+# ✅ Update config → Commit
+git add frontend/.env.example backend/alembic.ini
+git commit -m "chore: update environment variable templates (task 1.3)"
+```
+
+### 5. Documentation
+```bash
+# ✅ Add/update docs → Commit
+git add docs/ux/oauth-flow.md
+git commit -m "docs(ux): document Instagram OAuth user flow (task 5.1)"
+```
+
+### 6. Refactoring
+```bash
+# ✅ Refactor 1 function/module → Commit
+git add backend/services/product_matcher.py
+git commit -m "refactor(backend): extract category matching to separate function (task 14.1)"
+```
+
+## Commit Quality Gates
+
+### Pre-Commit Checks (Run Automatically)
+
+```bash
+# Create .git/hooks/pre-commit
+#!/bin/bash
+
+echo "🔍 Running pre-commit checks..."
+
+# 1. Check for secrets
+if git diff --cached | grep -iE '(api_key|secret|password|token).*=.*["\']?[a-zA-Z0-9]{20,}'; then
+  echo "❌ Potential secret detected! Remove before committing."
+  exit 1
+fi
+
+# 2. Check for debug statements
+if git diff --cached | grep -E '(console\.log|print\(|debugger|pdb\.set_trace)'; then
+  echo "⚠️  Debug statement found. Remove or confirm?"
+  read -p "Continue? (y/N) " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    exit 1
+  fi
+fi
+
+# 3. Lint staged files (if linters exist)
+if command -v ruff &> /dev/null; then
+  git diff --cached --name-only | grep '\.py$' | xargs ruff check --fix
+fi
+
+if command -v eslint &> /dev/null; then
+  git diff --cached --name-only | grep '\.(tsx?|jsx?)$' | xargs eslint --fix
+fi
+
+echo "✅ Pre-commit checks passed"
+```
+
+### Post-Implementation Validation
+
+Before committing, quickly verify:
+```bash
+# Backend: Does it run?
+uvicorn main:app --reload &
+sleep 2
+curl http://localhost:8000/health
+kill %1
+
+# Frontend: Does it build?
+npm run build
+
+# Tests: Do they pass?
+pytest tests/ -v
+```
+
+**If validation fails:** Fix → Commit fix separately
+
+## Commit Message Templates
+
+### Feature Implementation
+```
+feat(<scope>): <what> (task X.Y)
+
+Implements <feature description>.
+
+- Added <component/function>
+- Integrated with <external service>
+- Handles <edge case>
+```
+
+**Example:**
+```
+feat(backend): implement Instagram post fetching (task 6.1)
+
+Implements POST /api/posts endpoint to fetch recent Instagram posts.
+
+- Added InstagramService.fetch_user_posts()
+- Integrated with Graph API /me/media endpoint
+- Handles pagination for 20 posts
+- Caches results for 5 minutes
+```
+
+### Bug Fix
+```
+fix(<scope>): <what was broken> (task X.Y)
+
+Fixes <issue description>.
+
+Root cause: <why it broke>
+Solution: <how it's fixed>
+```
+
+**Example:**
+```
+fix(frontend): OAuth callback crashes on missing token (task 5.1)
+
+Fixes 500 error when Instagram OAuth callback is missing access_token.
+
+Root cause: callback.ts assumed access_token always present
+Solution: Added null check with user-friendly error message
+```
+
+### Refactoring
+```
+refactor(<scope>): <what changed> (task X.Y)
+
+Refactored <component> for <reason>.
+
+Changes:
+- <change 1>
+- <change 2>
+
+No functional changes.
+```
+
+### Test Addition
+```
+test(<scope>): add tests for <feature> (task X.Y)
+
+Added <test type> tests for <feature>.
+
+Coverage: <function/module>
+Cases: <edge cases tested>
+```
+
+## Commit Frequency Targets
+
+| Development Phase | Commits/Hour | Commits/Day |
+|-------------------|--------------|-------------|
+| Initial setup | 2-3 | 15-20 |
+| Feature development | 3-6 | 20-40 |
+| Bug fixing | 4-8 | 30-50 |
+| Refactoring | 2-4 | 15-25 |
+| Testing | 2-3 | 10-20 |
+
+**Target for 1-week MVP: 150-250 commits**
+
+## Automated Commit Helpers
+
+### 1. Git Aliases
+```bash
+# Add to ~/.gitconfig
+[alias]
+  # Quick commit with message
+  qc = "!f() { git add -A && git commit -m \"$1\"; }; f"
+
+  # Commit with conventional format
+  feat = "!f() { git add -A && git commit -m \"feat($1): $2\"; }; f"
+  fix = "!f() { git add -A && git commit -m \"fix($1): $2\"; }; f"
+  test = "!f() { git add -A && git commit -m \"test($1): $2\"; }; f"
+  docs = "!f() { git add -A && git commit -m \"docs($1): $2\"; }; f"
+
+  # Show commit stats
+  stats = shortlog -sn --all --no-merges
+
+# Usage:
+# git feat backend "add OAuth endpoint (task 4.3)"
+# git fix frontend "handle missing token (task 5.1)"
+```
+
+### 2. Shell Functions
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+
+# Smart commit: auto-detect scope from changed files
+smartcommit() {
+  local type=$1
+  local msg=$2
+  local task=$3
+
+  # Detect scope from git diff
+  local scope=$(git diff --cached --name-only | head -1 | cut -d/ -f1)
+
+  if [ -z "$scope" ]; then
+    scope="project"
+  fi
+
+  git add -A
+  git commit -m "${type}(${scope}): ${msg} (task ${task})"
+}
+
+# Usage:
+# smartcommit feat "add OAuth endpoint" 4.3
+# Output: feat(backend): add OAuth endpoint (task 4.3)
+```
+
+### 3. IDE Integration (VS Code)
+
+Create `.vscode/tasks.json`:
+```json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Quick Commit",
+      "type": "shell",
+      "command": "git add -A && git commit",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}
+```
+
+**Keybinding: Cmd+Shift+C → Quick commit**
+
+## Commit Batching Strategy
+
+### When to Batch vs. Single Commit
+
+**Single Commits (Preferred):**
+- ✅ One function implemented
+- ✅ One bug fixed
+- ✅ One test added
+- ✅ One component created
+
+**Batched Commits (Rare):**
+- ✅ Tightly coupled changes (model + migration)
+- ✅ Rename refactoring (multiple files)
+- ✅ Dependency update (package.json + lock file)
+
+**Example: Database Migration (Batched)**
+```bash
+# Change 1: Model
+git add backend/models/user.py
+
+# Change 2: Migration
+alembic revision --autogenerate -m "add user table"
+git add backend/alembic/versions/*.py
+
+# Commit together (tightly coupled)
+git commit -m "feat(db): add User model with migration (task 2.2)"
+```
+
+## Commit Recovery Patterns
+
+### Undo Last Commit (Keep Changes)
+```bash
+git reset --soft HEAD~1
+# Changes still staged, can recommit with better message
+```
+
+### Amend Last Commit
+```bash
+# Add forgotten file
+git add missing_file.py
+git commit --amend --no-edit
+
+# OR change message
+git commit --amend -m "feat(backend): corrected message (task 4.3)"
+```
+
+### Split Large Commit
+```bash
+# Reset last commit
+git reset HEAD~1
+
+# Stage and commit in parts
+git add backend/services/instagram.py
+git commit -m "feat(backend): add Instagram service (task 6.1)"
+
+git add backend/routers/posts.py
+git commit -m "feat(backend): add posts router (task 6.2)"
+```
+
+## Team Coordination
+
+### Push Frequency
+```bash
+# Push every 3-5 commits or every hour
+git push origin main
+
+# OR: Auto-push after every commit (aggressive)
+git config --global alias.acp '!git add -A && git commit -m "$1" && git push'
+# Usage: git acp "feat(backend): add OAuth (task 4.3)"
+```
+
+### Branch Strategy (If Using Feature Branches)
+```bash
+# Create feature branch per task group
+git checkout -b feature/instagram-integration
+
+# Commit frequently on feature branch
+git commit -m "feat(backend): add OAuth (task 4.1)"
+git commit -m "feat(backend): add token encryption (task 4.2)"
+git commit -m "feat(backend): add callback endpoint (task 4.3)"
+
+# Push feature branch
+git push -u origin feature/instagram-integration
+
+# Merge to main when task group complete
+git checkout main
+git merge feature/instagram-integration
+git push
+```
+
+## Metrics Dashboard
+
+Track your commit velocity:
+
+```bash
+# Commits today
+git log --since="midnight" --oneline | wc -l
+
+# Commits this week
+git log --since="1 week ago" --oneline | wc -l
+
+# Average commits per day (last 7 days)
+git log --since="1 week ago" --oneline | wc -l | awk '{print $1/7}'
+
+# Files changed per commit (should be low)
+git log --all --numstat --pretty="%H" | awk 'NF==3 {plus+=$1; minus+=$2} END {printf "%.0f files per commit\n", (plus+minus)/NR}'
+```
+
+**Healthy metrics:**
+- 20-40 commits/day
+- 1-5 files per commit
+- <100 lines per commit
+
+## Anti-Patterns
+
+### ❌ The "End of Day" Commit
+```bash
+# 5 PM: Finally committing everything
+git add .
+git commit -m "implemented features"
+# 50 files changed, 2000+ lines
+```
+
+**Why bad:**
+- Impossible to review
+- Can't revert specific changes
+- Lost context (what was the thought process?)
+- Risky deployment
+
+### ✅ The "Continuous Commit" Pattern
+```bash
+# 9:00 AM
+git commit -m "feat(backend): add User model (task 2.2.1)"
+
+# 9:30 AM
+git commit -m "feat(backend): add user migration (task 2.2.2)"
+
+# 10:00 AM
+git commit -m "test(backend): add User model tests (task 2.2.3)"
+
+# 10:30 AM
+git commit -m "fix(backend): handle null username in User (task 2.2.4)"
+```
+
+**Why good:**
+- Clear history
+- Easy review
+- Safe to revert any change
+- Shows progress
+
+## Integration with TaskMaster
+
+After each commit, optionally log in TaskMaster:
+
+```bash
+# Commit code
+git commit -m "feat(backend): add OAuth endpoint (task 4.3)"
+
+# Log in TaskMaster
+task-master update-subtask --id=4.3 --prompt="OAuth endpoint implemented and committed. Tested with curl. Works with real Instagram credentials."
+```
+
+**Benefit:** Team sees what's committed and what's still in progress.
+
+## Summary: The Perfect Commit Cycle
+
+```
+1. Implement small feature (15 min)
+   ↓
+2. Run quick validation (2 min)
+   ↓
+3. Stage changes (git add)
+   ↓
+4. Run pre-commit hooks (auto)
+   ↓
+5. Commit with clear message (30 sec)
+   ↓
+6. Push (if appropriate)
+   ↓
+7. Log in TaskMaster (1 min)
+   ↓
+8. Continue to next feature
+```
+
+**Total cycle: ~20 minutes**
+**Result: Clean history, safe rollbacks, team visibility**
+
+---
+
+**Remember: Commits are free. Make them often. Your future self will thank you.**

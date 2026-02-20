@@ -1,0 +1,387 @@
+---
+name: taskmaster-rapid-dev
+description: Rapid development workflow with TaskMaster integration for code-write-test-commit cycles
+---
+
+# TaskMaster Rapid Development Workflow
+
+This skill enables ultra-fast development cycles using TaskMaster task management.
+
+## When to Use
+
+- Starting a new development session
+- Working on TaskMaster-managed projects
+- Need to parallelize work across multiple tasks
+- Want to maintain fast commit velocity
+
+## Workflow Pattern
+
+### 1. Session Start (2 minutes)
+
+```bash
+# Check MCP connection first
+mcp-cli tools task-master-ai
+
+# Get next available task
+mcp-cli call task-master-ai/next_task '{}'
+
+# OR use CLI fallback
+task-master next
+```
+
+**Expected Output:**
+```json
+{
+  "taskId": "1.2",
+  "title": "Initialize Next.js frontend project",
+  "status": "pending",
+  "priority": "high"
+}
+```
+
+### 2. Task Planning (3 minutes)
+
+```bash
+# Get full task details
+mcp-cli call task-master-ai/get_task '{"taskId": "1.2"}'
+
+# OR CLI
+task-master show 1.2
+```
+
+**Review:**
+- Task description and requirements
+- Dependencies (are they complete?)
+- Test strategy
+- Subtask breakdown
+
+### 3. Implementation Sprint (15-30 minutes)
+
+**CRITICAL: Implement in small, committable chunks**
+
+#### Micro-Commit Strategy
+- ✅ Implement 1 feature → Commit immediately
+- ✅ Fix 1 bug → Commit immediately
+- ✅ Add 1 test → Commit immediately
+- ❌ Implement everything → Commit once (BAD)
+
+#### Example: Task 1.2 "Initialize Next.js frontend"
+
+**Chunk 1: Create project** (5 min)
+```bash
+npx create-next-app@latest frontend --typescript --tailwind --app --eslint
+cd frontend
+
+# Commit immediately
+git add frontend/
+git commit -m "feat(frontend): initialize Next.js 14 with TypeScript (task 1.2.1)"
+```
+
+**Chunk 2: Add shadcn/ui** (5 min)
+```bash
+npx shadcn-ui@latest init
+
+# Commit immediately
+git add frontend/
+git commit -m "feat(frontend): setup shadcn/ui components (task 1.2.2)"
+```
+
+**Chunk 3: Configure environment** (3 min)
+```bash
+# Create .env.local
+echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > frontend/.env.local
+
+# Commit immediately
+git add frontend/.env.local
+git commit -m "chore(frontend): add environment configuration (task 1.2.3)"
+```
+
+### 4. Quick Validation (2 minutes)
+
+```bash
+# Smoke test (does it run?)
+npm run dev
+# Check http://localhost:3000
+
+# Quick lint
+npm run lint
+
+# If tests exist, run them
+npm test
+```
+
+**If validation fails:**
+- Fix immediately
+- Commit fix separately
+- Don't move to next task with broken code
+
+### 5. Log Progress (1 minute)
+
+```bash
+# Update subtask with learnings
+mcp-cli call task-master-ai/update_subtask '{
+  "taskId": "1.2",
+  "notes": "Successfully initialized Next.js 14. Used App Router. Added shadcn/ui for components. Environment configured for localhost:8000 backend."
+}'
+
+# OR CLI
+task-master update-subtask --id=1.2 --prompt="Successfully initialized Next.js 14. Used App Router. Added shadcn/ui for components. Environment configured for localhost:8000 backend."
+```
+
+### 6. Mark Complete (30 seconds)
+
+```bash
+# Mark task as done
+mcp-cli call task-master-ai/set_task_status '{
+  "taskId": "1.2",
+  "status": "done"
+}'
+
+# OR CLI
+task-master set-status --id=1.2 --status=done
+```
+
+### 7. Get Next Task (30 seconds)
+
+```bash
+# Immediately get next task
+mcp-cli call task-master-ai/next_task '{}'
+```
+
+**Total cycle time: ~25 minutes per task**
+
+## Parallel Development Strategy
+
+### Scenario: Multiple independent tasks
+
+**Tasks:**
+- 1.1: Initialize FastAPI backend (backend-dev)
+- 1.2: Initialize Next.js frontend (frontend-dev)
+- 2.1: Design database schema (db-architect)
+
+**Approach: Spawn 3 agents in parallel**
+
+```bash
+# Terminal 1: Main orchestrator (YOU)
+claude
+
+# Terminal 2: Backend development
+cd backend && claude --agent backend-dev
+
+# Terminal 3: Frontend development
+cd frontend && claude --agent frontend-dev
+
+# Terminal 4: Database design
+cd backend && claude --agent db-architect
+```
+
+**Communication via TaskMaster:**
+- All agents use `update_subtask` to log progress
+- Main orchestrator monitors via `get_tasks`
+- Agents mark tasks `done` when complete
+- Main orchestrator assigns new tasks
+
+## Commit Best Practices
+
+### Conventional Commit Format
+
+```
+<type>(<scope>): <description> (task X.Y)
+
+feat(backend): implement Instagram OAuth endpoint (task 4.3)
+fix(frontend): handle missing access token in callback (task 5.2)
+test(integration): add webhook processing tests (task 11.4)
+docs(ux): add product registration flow diagram (task 8.1)
+refactor(db): optimize response logs query (task 16.2)
+```
+
+### Types
+- `feat`: New feature
+- `fix`: Bug fix
+- `test`: Add/update tests
+- `docs`: Documentation
+- `refactor`: Code restructuring
+- `chore`: Build, dependencies, config
+
+### When to Commit
+- ✅ Every 5-15 minutes during active coding
+- ✅ After implementing any working feature (even tiny)
+- ✅ After fixing any bug
+- ✅ After adding any test
+- ✅ Before switching tasks
+- ✅ Before asking for code review
+- ❌ "I'll commit when everything is perfect" (NEVER)
+
+## Time-Saving Aliases
+
+Add to `.bashrc` or `.zshrc`:
+
+```bash
+# TaskMaster shortcuts
+alias tm='task-master'
+alias tmn='task-master next'
+alias tms='task-master show'
+alias tmd='task-master set-status --id'
+alias tmu='task-master update-subtask --id'
+
+# Quick commit
+alias qc='git add . && git commit -m'
+
+# Example usage:
+# tmn                          # Get next task
+# tms 1.2                     # Show task 1.2
+# qc "feat(backend): add OAuth (task 4.3)"
+# tmu 4.3 --prompt="OAuth works, tested with real Instagram"
+# tmd 4.3 --status=done
+```
+
+## MCP-First Workflow (Recommended)
+
+If MCP is configured, prefer MCP tools over CLI:
+
+```javascript
+// In Claude Code conversation:
+
+// Get next task
+mcp-cli call task-master-ai/next_task '{}'
+
+// Get task details
+mcp-cli call task-master-ai/get_task '{"taskId": "1.2"}'
+
+// Update subtask
+mcp-cli call task-master-ai/update_subtask '{
+  "taskId": "1.2",
+  "notes": "Implementation notes here"
+}'
+
+// Mark complete
+mcp-cli call task-master-ai/set_task_status '{
+  "taskId": "1.2",
+  "status": "done"
+}'
+```
+
+**Why MCP over CLI?**
+- ✅ No shell context switching
+- ✅ Results in Claude conversation history
+- ✅ Can be used in automation
+- ✅ Faster (no subprocess spawn)
+
+## Anti-Patterns to Avoid
+
+### ❌ The "Perfect Commit" Trap
+```
+Day 1: Implement 15 files
+Day 2: Still implementing
+Day 3: Finally commit everything
+Result: Lost context, hard to review, risky deployment
+```
+
+### ✅ The Rapid Commit Pattern
+```
+Hour 1: Implement auth.py → Commit
+Hour 2: Add auth tests → Commit
+Hour 3: Fix auth bug → Commit
+Result: Clear history, easy rollback, safe deployment
+```
+
+### ❌ The "I'll Track It Later" Trap
+```
+Implement 5 tasks
+Forget to update TaskMaster
+Can't remember what worked/didn't work
+Repeat same mistakes
+```
+
+### ✅ The Disciplined Logging Pattern
+```
+Complete 1 task → update_subtask immediately
+Complete 2nd task → update_subtask immediately
+Result: Team knows what's working, learns from your notes
+```
+
+## Performance Metrics
+
+**Target Metrics:**
+- Commits per hour: 3-6
+- Task completion per day: 5-10
+- Time from task start to first commit: <15 minutes
+- Time from implementation to logging: <2 minutes
+
+**Warning Signs:**
+- 🔴 No commits in 1 hour → You're overthinking
+- 🔴 Task in-progress for >2 hours → Break it down or ask for help
+- 🔴 Haven't updated subtask in 30 minutes → Log progress now
+
+## Example: Perfect 30-Minute Task Cycle
+
+```bash
+# 0:00 - Get task
+task-master next
+# Output: Task 4.3 "Create OAuth callback endpoint"
+
+# 0:02 - Review details
+task-master show 4.3
+# Read: Implement POST /api/auth/instagram/callback
+
+# 0:05 - Start implementation
+# Create backend/routers/auth.py
+
+# 0:15 - First commit
+git add backend/routers/auth.py
+git commit -m "feat(backend): add OAuth callback route skeleton (task 4.3)"
+
+# 0:20 - Implement token exchange logic
+
+# 0:25 - Second commit
+git add backend/routers/auth.py
+git commit -m "feat(backend): implement token exchange in OAuth (task 4.3)"
+
+# 0:27 - Quick test
+curl -X POST http://localhost:8000/api/auth/instagram/callback
+
+# 0:28 - Log progress
+task-master update-subtask --id=4.3 --prompt="OAuth callback implemented. Token exchange works. Need to add encryption next."
+
+# 0:30 - Mark done (or in-progress if incomplete)
+task-master set-status --id=4.3 --status=done
+
+# 0:30 - Get next task
+task-master next
+```
+
+**Result: 2 commits, 1 task completed, progress logged, ready for next task**
+
+## Integration with Agents
+
+When using specialized agents (backend-dev, frontend-dev, etc.):
+
+1. **Assign tasks by domain**
+   - backend-dev: Tasks 1.1, 2.2, 4.x
+   - frontend-dev: Tasks 1.2, 5.x, 8.x
+   - db-architect: Tasks 2.1, 2.3
+
+2. **Agents follow same workflow**
+   - Get task → Implement → Commit → Log → Complete
+
+3. **Orchestrator monitors**
+   - Main Claude session runs `task-master list` periodically
+   - Sees which agents completed what
+   - Assigns new tasks
+
+4. **Communication via subtask notes**
+   - Agents log blockers in `update_subtask`
+   - Other agents read notes before starting related tasks
+   - Example: "backend-dev: OAuth endpoint ready at POST /api/auth/instagram/callback"
+
+## Summary Checklist
+
+Before claiming a task is "done":
+- [ ] Code implements the requirements
+- [ ] At least 1 commit made (ideally 2-4)
+- [ ] Quick validation passed (runs without errors)
+- [ ] Progress logged in `update_subtask`
+- [ ] Task marked `done` in TaskMaster
+- [ ] Next task retrieved
+
+**Remember: Velocity beats perfection in MVPs. Ship small, ship often, iterate fast.**
